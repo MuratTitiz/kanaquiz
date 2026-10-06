@@ -1,0 +1,1264 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>KANA Word Battle</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{--bg:#10162f;--card:#1b2450;--ink:#f4f6ff;--mute:#9aa6d6;--acc:#ffd23f;--ok:#2ecc71;--bad:#ff5a5f;--blue:#3d7bff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;-webkit-tap-highlight-color:transparent}
+#app{max-width:560px;margin:0 auto;padding:16px;min-height:100vh}
+h1{font-size:26px;margin:8px 0 4px;letter-spacing:.5px}
+h2{font-size:19px;margin:18px 0 8px}
+p{color:var(--mute);line-height:1.5}
+.card{background:var(--card);border-radius:16px;padding:16px;margin:12px 0}
+button,select,input,textarea{font:inherit;color:inherit}
+.btn{display:block;width:100%;padding:15px;border:0;border-radius:14px;background:var(--blue);color:#fff;font-weight:700;font-size:17px;margin:8px 0;cursor:pointer}
+.btn.gold{background:var(--acc);color:#1a1a1a}
+.btn.ghost{background:transparent;border:2px solid #3a4580;color:var(--ink)}
+.btn.small{display:inline-block;width:auto;padding:8px 12px;font-size:14px;margin:4px 4px 4px 0}
+.btn:disabled{opacity:.45}
+select,input,textarea{width:100%;padding:12px;border-radius:12px;border:2px solid #3a4580;background:#121a3d;margin:6px 0}
+textarea{min-height:120px}
+.opt{display:block;width:100%;text-align:left;padding:16px;border-radius:14px;border:2px solid #3a4580;background:#121a3d;font-size:18px;margin:10px 0;cursor:pointer}
+.opt.ok{background:var(--ok);border-color:var(--ok);color:#06230f;font-weight:700}
+.opt.bad{background:var(--bad);border-color:var(--bad);color:#fff}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:#2b3670;color:var(--acc);letter-spacing:.5px}
+.prompt{font-size:26px;font-weight:800;margin:14px 0 4px;line-height:1.3}
+.sub{color:var(--mute);font-size:14px}
+.bar{display:flex;justify-content:space-between;align-items:center;font-weight:700}
+.timer{font-size:22px;font-variant-numeric:tabular-nums;color:var(--acc)}
+.timer.low{color:var(--bad)}
+.prog{height:8px;background:#2b3670;border-radius:9px;overflow:hidden;margin:8px 0}
+.prog i{display:block;height:100%;background:var(--acc);transition:width .2s}
+.row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:#121a3d;margin:6px 0}
+.row.me{outline:2px solid var(--acc)}
+.row .rk{width:34px;font-weight:800;font-size:18px;text-align:center}
+.row .nm{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .sc{font-weight:800;font-variant-numeric:tabular-nums;color:var(--acc)}
+.row .xs{font-size:12px;color:var(--mute)}
+.big{font-size:54px;font-weight:900;text-align:center;color:var(--acc);margin:8px 0}
+.center{text-align:center}
+.names{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.names .opt{margin:0;font-size:16px;padding:14px 10px;text-align:center}
+.tabs{display:flex;gap:6px;margin:10px 0}
+.tabs button{flex:1;padding:10px 4px;border-radius:12px;border:0;background:#1b2450;color:var(--mute);font-weight:700}
+.tabs button.on{background:var(--blue);color:#fff}
+#qr{background:#fff;padding:14px;border-radius:14px;display:inline-block}
+.chip{display:inline-block;background:#2b3670;border-radius:99px;padding:6px 12px;margin:3px;font-size:14px}
+.err{color:var(--bad);font-weight:600}
+@media(min-width:900px){#app.wide{max-width:900px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script id="data">
+/* ===================== CONTENT (from the textbook word list) ===================== */
+const RAW=`
+a|1つの|9
+about|…について|9
+article|記事|9
+before|…の前に|9
+cleaning|そうじ|9
+come|来る|9
+cool|かっこいい|9
+hey|やあ、おい|9
+newspaper|新聞|9
+photography|写真撮影|9
+practice|練習する|9
+read|読む|9
+ride|乗る|9
+school|学校|9
+sister|姉、妹|9
+summer|夏|9
+title|タイトル、題名|9
+today|きょう|9
+tournament|トーナメント|9
+video|動画|9
+art|芸術、美術|8
+coach|コーチ、指導者|8
+contest|コンテスト|8
+fun|楽しいこと|8
+minute|分|8
+social|社会の|8
+start|始める|8
+table|テーブル|8
+tennis|テニス|8
+game|試合、ゲーム|10
+junior high school|中学校|10
+last|この前の、最後の|10
+o'clock|…時|10
+prize|賞|10
+Saturday|土曜日|10
+team|チーム|10
+win|勝つ|10
+year|年|10
+surely|確かに、きっと|10
+final|最後の|10
+half|半分|11
+hour|1時間|11
+poem|詩|11
+spread|広げる、広がる|11
+traditional|伝統的な|11
+two|2|11
+until|…まで（ずっと）|11
+each|それぞれの|11
+day|日|11
+flight|飛行便|13
+daughter|娘|13
+gate|門、搭乗口|13
+immediately|すぐに|13
+importance|重要性|13
+paint|絵の具でかく|13
+past|過去|13
+time|時間|13
+curry|カレー|16
+depressed|落胆した|16
+excited|興奮した、わくわくした|16
+happy|幸せな、うれしい|16
+love|愛する、大好きである|16
+lunch|昼食|16
+plastic|プラスチックの|16
+rainy|雨の|16
+rice|米|16
+shoe|靴|16
+story|物語|16
+sunny|晴れた|16
+teacher|先生|16
+tomorrow|あした|16
+vegetable|野菜|16
+water|水|16
+child|子ども|16
+another|もう1つの、別の|17
+adventure|冒険|17
+garden|庭|17
+happen|起こる|17
+many|多くの|17
+naughty|いたずらな|17
+rabbit|ウサギ|17
+series|シリーズ|17
+trouble|心配、困難|17
+exciting|興奮させる、わくわくする|18
+interesting|おもしろい|18
+think|考える、思う|18
+dad|お父さん|18
+amazing|驚くべき|19
+beautiful|美しい|19
+enjoy|楽しむ|19
+factory|工場|19
+hope|望む|19
+house|家|19
+landscape|風景|19
+live|住む|19
+nature|自然|19
+picture|絵、写真|19
+realize|理解する、気づく|19
+scenery|風景、景色|19
+someday|いつか|19
+still|まだ、今でも|19
+wow|うわー|19
+museum|博物館、美術館|19
+action|動作、アクション|20
+dictionary|辞書|20
+fantasy|空想、ファンタジー|20
+fiction|小説、創作|20
+great|すばらしい|20
+home|家庭、家|20
+movie|映画|20
+science|理科、科学|20
+sure|確信して|20
+comedy|喜劇|20
+agree|賛成する|21
+famous|有名な|21
+funny|おかしい、おもしろい|21
+heartwarming|心温まる|21
+horror|恐怖、ホラー|21
+message|伝言、メッセージ|21
+mystery|推理小説、ミステリー|21
+novel|小説|21
+reach|…に着く、達する|21
+because|（なぜなら）…だから|22
+faraway|遠い|22
+finish|終わらせる|22
+grown-up|おとな|22
+perfect|完全な|22
+recommend|推薦する|22
+town|町|22
+training|訓練|22
+vocabulary|語彙|22
+witch|魔女|22
+young|若い|22
+among|…の間で|23
+popular|人気のある|23
+post|投稿する|23
+teenager|10代の少年少女|23
+write|書く|23
+abandoned|捨てられた|25
+careful|注意深い|25
+costume|衣装|25
+improve|よりよくする、改善する|25
+rescue|救助、救う|25
+research|研究、調査|25
+clerk|店員|26
+color|色|26
+courage|勇気|26
+cute|かわいい|26
+dollar|ドル|26
+hello|やあ、こんにちは|26
+help|手伝う、助ける|26
+pizza|ピザ|26
+please|どうぞ|26
+purple|紫色|26
+red|赤色|26
+suggest|提案する|26
+swimsuit|水着|26
+T-shirt|Tシャツ|26
+astronaut|宇宙飛行士|28
+build|建てる|28
+human|人間|28
+interpreter|通訳者|28
+job|仕事|28
+music|音楽|28
+people|人々|28
+tower|塔、タワー|28
+travel|旅行する|28
+vet|獣医|28
+want|…したい、ほしい|28
+work|働く|28
+world|世界|28
+bake|（オーブンで）焼く|29
+bakery|パン店|29
+bread|パン|29
+cake|ケーキ|29
+cooking|料理|29
+decide|決心する|29
+idea|考え、アイデア|29
+interest|興味、関心|29
+loud|（声・音が）大きい|29
+perhaps|ことによると|29
+steak|ステーキ|29
+surfing|サーフィン|29
+thing|物、事|29
+buy|買う|30
+customer|（店の）客|30
+drink|飲む|30
+international|国際的な|30
+listen|聞く|30
+relax|くつろぐ|30
+shop|店|30
+something|何か|30
+study|勉強する|30
+use|使う|30
+awesome|すばらしい、すごい|31
+choose|選ぶ|31
+discount|割引|31
+enough|十分な|31
+later|あとで|31
+plenty|たくさん|31
+problem|問題|31
+provide|供給する、与える|31
+several|いくつかの|31
+solve|解決する|31
+throw|投げる|31
+thunder|雷|31
+waste|むだに使う|31
+way|方法、道|31
+eat|食べる|32
+firework|花火|32
+hand|手|32
+jump|とぶ|32
+kitchen|台所|32
+mask|マスク|32
+pool|プール|32
+quiet|静かな|32
+reuse|再利用する|32
+rule|規則、ルール|32
+smart|頭の良い|32
+smartphone|スマートフォン|32
+swim|泳ぐ|32
+wash|洗う|32
+wear|身につけている|32
+week|週|32
+cloth|布|33
+explore|探検する|33
+future|未来、将来|33
+nice|すてきな|33
+chef|料理長、シェフ|33
+baker|パン職人|34
+building|建物|34
+environment|環境|34
+foreign|外国の|34
+guide|案内人、ガイド|34
+impossible|不可能な|34
+nothing|何も…ない|34
+shock|衝撃を与える|34
+stay|滞在する|34
+tour|旅行、ツアー|34
+tourist|観光客|34
+tree|木|34
+university|大学|34
+cut|切る|34
+few|少数の|35
+find|見つける|35
+local|地元の|35
+major|主要な|35
+restroom|トイレ|35
+return|帰る、戻る|35
+sell|売る|35
+simply|簡単に、単に|35
+system|仕組み|35
+worried|心配して|35
+decoration|飾り|35
+community|地域社会|37
+furniture|家具|37
+knitting|編み物|37
+paper|紙|37
+actually|実際は|37
+electricity|電気|37
+center|中心地、センター|37
+actor|俳優|39
+confident|自信のある|39
+doctor|医者|39
+interview|インタビュー|39
+musician|音楽家|39
+neighbor|近所の人|39
+police officer|警察官|39
+reason|理由|39
+scientist|科学者|39
+volunteer|ボランティア|39
+catch|捕まえる|40
+everywhere|どこでも|40
+mother|母|40
+net|網、ネット|40
+outside|外に|40
+pie|パイ|40
+say|言う|40
+put|置く|40
+notice|気がつく|41
+party|パーティー|41
+radio|ラジオ|41
+rush|勢いよく走る|41
+shout|叫ぶ|41
+stop|止まる、止める|41
+straight|まっすぐに|41
+again|もう一度|42
+button|ボタン|42
+cabbage|キャベツ|42
+finally|ついに、最後に|42
+hidden|隠れた|42
+jacket|上着|42
+lose|失う、負ける|42
+never|決して…ない|42
+potato|ジャガイモ|42
+run|走る|42
+safe|安全な|42
+suddenly|突然|42
+watering can|じょうろ|42
+wriggle|身をよじる|42
+bed|ベッド|43
+night|夜|43
+taxi|タクシー|43
+tired|疲れた|43
+wonder|…かしらと思う|43
+very|とても|43
+department store|デパート|46
+manga|マンガ|46
+officer|警察官、役人|46
+store|店|46
+sweater|セーター|46
+topic|話題|46
+billion|10億|47
+college|大学|47
+dirty|汚い|47
+drinking water|飲料水|47
+pie chart|円グラフ|47
+pond|池|47
+presentation|発表|47
+river|川|47
+should|…すべきである|47
+show|見せる|47
+than|…よりも|47
+understand|理解する|49
+million|100万|49
+image|印象、イメージ|49
+imitate|まねる|49
+rain|雨|49
+sick|病気の|49
+situation|状況|49
+step|一歩|49
+crop|農作物|49
+already|すでに、もう|50
+graph|グラフ|50
+noon|正午|50
+note|メモ|50
+wait|待つ|50
+sleeve|そで|50
+easily|楽々と、容易に|51
+eco-friendly|環境にやさしい|51
+electronic|電子の|51
+goods|商品|51
+product|製品|51
+recycle|再生する、リサイクルする|51
+reduce|減らす|51
+review|見直す|51
+save|救う、節約する|51
+turn|回る、回す|51
+blog|ブログ|52
+collect|集める|52
+event|行事|52
+handout|プリント|52
+set|置く、設定する|52
+side|側|52
+climate change|気候変動|53
+donate|寄付する|53
+environmental|環境の|53
+following|次の|53
+global warming|地球温暖化|53
+issue|問題（点）|53
+pollution|汚染|53
+rise|のぼる、上がる|53
+sea|海|53
+walk|歩く|53
+warming|暖めること|53
+anniversary|記念日|55
+celebrate|祝う|55
+cost|（金が）かかる|55
+fountain pen|万年筆|55
+hall|会館、ホール|55
+member|一員|55
+pencil|鉛筆|55
+touch|触れる|55
+typewriter|タイプライター|55
+bag|かばん|56
+cold|寒い、冷たい|56
+dangerous|危険な|56
+forget|忘れる|56
+money|お金|56
+point|要点、点|56
+scary|恐ろしい|56
+view|景色、ながめ|56
+always|いつも|58
+birthday|誕生日|58
+cookie|クッキー|58
+strange|奇妙な|58
+towel|タオル|58
+guidebook|観光案内書|59
+join|参加する|59
+mountain|山|59
+organize|計画する、準備する|59
+rock|岩|59
+send|送る|59
+sign|標識|59
+silence|静けさ、沈黙|59
+soup|スープ|59
+thank|感謝する|59
+website|ウェブサイト|59
+call|…を〜と呼ぶ|60
+concert|演奏会|60
+peach|モモ|60
+state|州|60
+ticket|切符、チケット|60
+ancestor|祖先|61
+British|英国（人）の|61
+explorer|探検家|61
+hurt|傷つける|61
+nation|国家|61
+native|その土地に生まれた|61
+pepper|コショウ|61
+rest|休憩|61
+sacred|神聖な|61
+sad|悲しい|61
+sunrise|日の出|61
+sunset|日の入り|61
+tradition|伝統|61
+artwork|芸術作品|62
+brush|ブラシ、筆|62
+code|暗号、コード|62
+cook|料理する|62
+pale|顔色が悪い|62
+place|場所|62
+shoot|撃つ、シュートする|62
+short|短い|62
+spell|字をつづる|62
+studio|スタジオ、アトリエ|62
+welcome|ようこそ|62
+attractive|魅力的な|63
+bring|持ってくる|63
+castle|城|63
+different|違った|63
+fantastic|とてもすばらしい|63
+fortune|運、運勢|63
+relaxing|くつろがせる|63
+symbol|象徴|63
+tasteless|味のない|63
+top|頂上|63
+artist|芸術家|64
+craft|工芸|64
+cup|カップ|64
+gather|集める、集まる|64
+handmade|手作りの|64
+market|市場|64
+spot|場所、地点|64
+festival|祭り|65
+heritage|遺産|65
+season|季節|65
+theme|主題、テーマ|65
+theme park|テーマパーク|65
+expect|予想する|67
+expo|博覧会|67
+station|駅|67
+tell|言う、知らせる|67
+woman|女性|67
+country|国|70
+large|大きい、広い|70
+prefecture|県|70
+southeast|南東|70
+textbook|教科書|70
+busy|忙しい|71
+carry|運ぶ|71
+chocolate|チョコレート|71
+food|食べ物|71
+language|言語|71
+noodle|めん類|71
+often|たびたび、よく|71
+positive|前向きな|71
+same|同じ|71
+ship|船|71
+various|さまざまな|71
+activity|活動|72
+beach|浜辺|72
+important|重要な|72
+list|リスト、一覧表|72
+peace|平和|72
+sand|砂|72
+sandal|サンダル|72
+shopping|買い物|72
+sightseeing|観光|72
+social studies|社会科|72
+sunscreen|日焼け止め|72
+swimming|水泳|72
+useful|役に立つ|72
+without|…なしで|72
+answer|答え|73
+ceremony|式典|73
+culture|文化|73
+nearby|近くの|73
+origami|折り紙|73
+passenger|乗客|73
+sometimes|ときどき|73
+student|生徒|73
+tea|茶|73
+bad|悪い|74
+cheerful|元気のいい|74
+daily|毎日の、日常の|74
+hamburger|ハンバーガー|74
+move|動かす、引っ越す|74
+musical|音楽の、ミュージカル|74
+peanut|ピーナッツ|74
+seafood|魚介類|74
+terrible|ひどい|74
+tiger|トラ|74
+bagpipes|バグパイプ|75
+candle|ろうそく|75
+colorful|色彩に富んだ|75
+crane|ツル|75
+park|公園|75
+piece|1つ、ひとかけら|75
+stationery|文房具|75
+toilet paper|トイレットペーパー|75
+try|努力する、試す|75
+wrapper|包み紙|75
+arrive|到着する|76
+dear|親愛なる|76
+everything|すべてのこと|76
+experience|経験|76
+memorial|記念の|76
+memory|思い出|76
+remember|覚えている|76
+surprised|驚いた|76
+yesterday|きのう|76
+choice|選択|77
+discovery|発見|77
+enter|入る|77
+guest|客|77
+inside|…の内側に|77
+morning|朝|77
+opportunity|機会|77
+purpose|目的|77
+seasonal|季節の|77
+spring|春|77
+surprising|驚くべき|77
+refreshing|さわやかな|80
+shrimp|小エビ|80
+tempura|てんぷら|80
+tuna|マグロ|80
+typical|代表的な|80
+why|なぜ|80
+chip|ポテトチップス|81
+cream|クリーム|81
+ice cream|アイスクリーム|81
+information|情報|81
+Japanese-style|日本式の|81
+modern|現代の|81
+rice cake|もち|81
+sour|すっぱい|81
+taste|味|81
+topping|トッピング|81
+card|カード|82
+giraffe|キリン|82
+lion|ライオン|82
+maybe|たぶん|82
+national|国の、国立の|82
+rhythm|リズム|82
+safari|サファリ|82
+search|さがす|82
+virtual|仮想の|82
+wild|野生の|82
+certainly|確かに、きっと|83
+excellent|優れた|83
+explain|説明する|83
+fifteen|15|83
+lucky|運のよい|83
+personal|個人的な|83
+worth|…の価値がある|83
+beautifully|美しく|84
+chance|機会、チャンス|84
+cultural|文化の|84
+east|東|84
+introduce|紹介する|84
+pork|豚肉|84
+pressure|圧力|84
+recipe|レシピ|84
+sauce|ソース|84
+skill|技術、技能|84
+spring roll|春巻き|84
+tea ceremony|茶道|84
+teach|教える|84
+technique|専門技術|84
+knowledgeable|よく知っている|85
+sorry|すまなく思って|85
+unforgettable|忘れられない|85
+gift|贈り物|87
+deep|深い|88
+pants|ズボン|88
+seen|see の過去分詞|88
+winter|冬|88
+wall|壁、城壁|88
+cutout|切り抜き（絵）|89
+door|ドア|89
+express|表現する|89
+folk|民間の、人々|89
+grandmother|祖母|89
+happiness|幸福|89
+plant|植物|89
+scissors|はさみ|89
+window|窓|89
+ever|今までに|90
+golden|金色の|90
+kabuki|歌舞伎|90
+add|加える|91
+follow|ついて行く、従う|91
+glass|ガラス、コップ|91
+hear|聞こえる|91
+hot|熱い、暑い|91
+jasmine|ジャスミン|91
+open|開く|91
+pot|つぼ、ポット|91
+sing|歌う|91
+smile|ほほえみ|91
+soon|もうすぐ|91
+captain|キャプテン|92
+coaster|ジェットコースター|92
+frightened|おびえた|92
+proud|誇りに思って|92
+relieved|ほっとした|92
+cheap|安い|93
+design|デザイン|93
+expensive|高価な|93
+fan|ファン、うちわ|93
+lantern|ちょうちん|93
+overseas|海外に|93
+souvenir|おみやげ|93
+stamp|切手|93
+visitor|訪問者|93
+against|…に対抗して|94
+anyone|だれでも|94
+closet|収納室|94
+P.E.|体育|94
+price|値段|94
+watermelon|スイカ|94
+wrap|包む|94
+huge|巨大な|95
+present|贈り物|95
+tiny|とても小さい|95
+toy|おもちゃ|95
+vacation|休暇|95
+valuable|高価な|95
+vase|花びん|95
+adventurer|冒険家|97
+glad|うれしい|97
+lonely|さびしい|97
+ready|用意ができて|97
+sail|航海する|97
+bright|輝く、明るい|98
+desert|砂漠|98
+double|2倍の|98
+fishing|魚釣り|98
+island|島|98
+knife|ナイフ|98
+soap|せっけん|98
+dinner|夕食|100
+homework|宿題|100
+teeth|歯（複数）|100
+yet|もう、まだ|100
+act|演じる|101
+change|変える、変わる|101
+conversation|会話|101
+extra|余分の|101
+fact|事実|101
+owner|持ち主|101
+performer|演じる人|101
+program|番組|101
+really|本当に|101
+voice|声|101
+since|…以来|102
+long|長い|102
+almost|ほとんど|103
+begin|始まる、始める|103
+example|例|103
+purse|さいふ|103
+represent|表す|103
+tool|道具|103
+usually|たいてい、ふつう|103
+abroad|外国へ|104
+joke|冗談|104
+news|ニュース、知らせ|104
+perform|演じる、演奏する|104
+performance|演技、演奏|104
+quarter|4分の1|104
+sense|感覚|104
+united|連合した|104
+between|…の間に|105
+continue|続ける|105
+custom|慣習|105
+difference|違い|105
+difficulty|難しさ|105
+dust|ちり、ほこり|105
+laugh|笑う|105
+manners|作法、マナー|105
+nearly|ほとんど|105
+opinion|意見|105
+peaceful|平和な|105
+plan|計画|105
+pleasure|喜び|105
+sound|音|105
+together|いっしょに|105
+bath|入浴|108
+chestnut|クリの実|108
+favorite|お気に入りの|108
+flea market|のみの市|108
+hot spring|温泉|108
+impressive|印象的な|108
+menu|メニュー|108
+mushroom|キノコ|108
+photo|写真|108
+port|港|108
+roast|焼いた|108
+serve|（食事を）出す|108
+star-shaped|星形の|108
+strongly|強く|108
+thousand|1,000|108
+type|型、種類|108
+viewing|見ること、鑑賞|108
+available|入手できる|109
+during|…の間に|109
+meal|食事|109
+Monday|月曜日|109
+priest|僧侶|109
+thirsty|のどがかわいて|109
+weekend|週末|109
+away|離れて|110
+carefully|注意深く|110
+invite|招待する|110
+master|主人、名人|110
+neighboring|近所の|110
+privacy|プライバシー|110
+shelf|たな|110
+temple|寺|110
+visit|訪問する|110
+worry|心配する|110
+mean|意味する|111
+passion|情熱|111
+simple|簡単な|111
+stuff|もの|111
+sugar|砂糖|111
+wipe|ふく、ぬぐう|111
+believe|信じる|112
+break|こわす、割る|112
+eaten|eat の過去分詞|112
+ground|地面|112
+miss|機会を逃す|112
+pick|摘む、選ぶ|112
+plate|皿|112
+trust|信頼する|112
+ear|耳|113
+precious|貴重な、大切な|113
+pudding|プリン|113
+ring|鳴る|113
+`;
+
+const VERBS=`cost,cost,cost,costing
+hit,hit,hit,hitting
+hurt,hurt,hurt,hurting
+put,put,put,putting
+quit,quit,quit,quitting
+read,read,read,reading
+set,set,set,setting
+spread,spread,spread,spreading
+become,became,become,becoming
+come,came,come,coming
+run,ran,run,running
+bring,brought,brought,bringing
+build,built,built,building
+buy,bought,bought,buying
+catch,caught,caught,catching
+feel,felt,felt,feeling
+fight,fought,fought,fighting
+find,found,found,finding
+forget,forgot,forgotten,forgetting
+get,got,gotten,getting
+have,had,had,having
+hear,heard,heard,hearing
+hold,held,held,holding
+keep,kept,kept,keeping
+lead,led,led,leading
+leave,left,left,leaving
+lose,lost,lost,losing
+make,made,made,making
+mean,meant,meant,meaning
+meet,met,met,meeting
+say,said,said,saying
+sell,sold,sold,selling
+send,sent,sent,sending
+shoot,shot,shot,shooting
+sit,sat,sat,sitting
+sleep,slept,slept,sleeping
+spend,spent,spent,spending
+stand,stood,stood,standing
+teach,taught,taught,teaching
+tell,told,told,telling
+think,thought,thought,thinking
+understand,understood,understood,understanding
+win,won,won,winning
+begin,began,begun,beginning
+bite,bit,bitten,biting
+break,broke,broken,breaking
+choose,chose,chosen,choosing
+do,did,done,doing
+draw,drew,drawn,drawing
+drink,drank,drunk,drinking
+drive,drove,driven,driving
+eat,ate,eaten,eating
+fall,fell,fallen,falling
+fly,flew,flown,flying
+give,gave,given,giving
+go,went,gone,going
+grow,grew,grown,growing
+hide,hid,hidden,hiding
+know,knew,known,knowing
+ride,rode,ridden,riding
+rise,rose,risen,rising
+see,saw,seen,seeing
+shake,shook,shaken,shaking
+show,showed,shown,showing
+sing,sang,sung,singing
+speak,spoke,spoken,speaking
+swim,swam,swum,swimming
+take,took,taken,taking
+wear,wore,worn,wearing
+write,wrote,written,writing`.split('\n').map(l=>l.split(','));
+
+const COMPS=`big,bigger,biggest
+bright,brighter,brightest
+busy,busier,busiest
+clean,cleaner,cleanest
+cold,colder,coldest
+cool,cooler,coolest
+deep,deeper,deepest
+early,earlier,earliest
+fast,faster,fastest
+great,greater,greatest
+happy,happier,happiest
+hard,harder,hardest
+high,higher,highest
+hot,hotter,hottest
+large,larger,largest
+light,lighter,lightest
+long,longer,longest
+loud,louder,loudest
+near,nearer,nearest
+new,newer,newest
+nice,nicer,nicest
+old,older,oldest
+pretty,prettier,prettiest
+quick,quicker,quickest
+rich,richer,richest
+short,shorter,shortest
+slow,slower,slowest
+small,smaller,smallest
+strong,stronger,strongest
+tall,taller,tallest
+warm,warmer,warmest
+beautiful,more beautiful,most beautiful
+colorful,more colorful,most colorful
+dangerous,more dangerous,most dangerous
+delicious,more delicious,most delicious
+difficult,more difficult,most difficult
+easily,more easily,most easily
+exciting,more exciting,most exciting
+expensive,more expensive,most expensive
+famous,more famous,most famous
+important,more important,most important
+interesting,more interesting,most interesting
+popular,more popular,most popular
+useful,more useful,most useful
+bad,worse,worst
+good,better,best
+well,better,best
+little,less,least
+many,more,most
+much,more,most`.split('\n').map(l=>l.split(','));
+
+/* Grammar: sentence | correct | wrong | wrong | wrong */
+const GRAMMAR=`Singapore is ___ than Tokyo.|smaller|small|smallest|more small
+Singapore is the ___ country in Southeast Asia.|smallest|smaller|small|most small
+Sightseeing is ___ popular than shopping.|more|most|much|many
+Sightseeing is the ___ popular activity on the list.|most|more|much|best
+I like tigers the ___.|best|better|good|most
+I am taller ___ my father.|than|that|as|of
+He has as many books ___ he has.|as|than|so|like
+I have ___ here for ten years.|lived|live|living|lives
+I have ___ a panda once.|seen|saw|see|seeing
+I have already ___ my homework.|done|did|do|doing
+It has been ___ for three days.|raining|rain|rained|rains
+That song will be ___ by everyone.|loved|love|loving|loves
+This house is ___ of wood.|made|make|making|makes
+I ___ the news on the radio. (自然に聞こえた)|heard|listened|sounded|looked
+I ___ to the music. (注意して聞いた)|listened|heard|hear|sounded
+He ___ at the painting carefully.|looked|saw|watched|seen
+We ___ the movie on TV.|watched|looked|saw at|seen
+He ___ me about his life.|told|said|spoke|talked
+He ___, "Hello."|said|told|talked|spoke
+___ I speak to Mark, please?|May|Do|Am|Have
+I ___ to Koji yesterday.|talked|told|said|spoken
+I'll ___ my camera to your party.|bring|take|go|come
+I'll ___ you to the airport.|take|bring|come|carry
+A: Dinner is ready.  B: I'm ___.|coming|going|come|go
+You ___ medicine. (薬を飲む)|take|drink|eat|have
+You ___ soup with a spoon.|eat|drink|take|bite
+Tokyo Sky Tree is very ___.|high|tall|long|large
+Mr. Oka is ___. (背が高い)|tall|high|long|big
+I'm ___ science at school.|studying|learning to|study|studied
+I'm ___ the guitar. (身につけている)|learning|studying to|learn|learned
+I gave a book ___ her.|to|for|at|of
+I gave ___ a book.|her|to her|she|hers
+I'm angry ___ you didn't keep a promise.|because|so|but|if
+___ you like, you can use chopsticks.|If|Because|So|But
+If I ___ rich, I would travel around the world.|were|am|be|will be
+I wish I ___ fly.|could|can|will|may
+I want ___ more about Japan.|to know|know|knowing|knew
+I want you ___ and help me.|to come|come|coming|came
+I am learning ___ to swim.|how|what|who|which
+He was surprised ___ the news.|to hear|hear|heard|hears
+This is too difficult ___ me.|for|to|of|at
+Chinese is difficult for us ___.|to learn|learn|learning|learned
+There ___ more than twenty people in the room.|are|is|be|am
+Each of the boys ___ his own guitar.|has|have|having|are
+We ___ a good time at the party.|had|have a|has|having
+School ___ at eight.|begins|begin|beginning|begun
+The store ___ at seven o'clock.|closes|close|closing|closed
+He must ___ this book by the end of this month.|finish|finishes|finished|finishing
+You ___ park your car here. (禁止)|mustn't|don't have|aren't|can not to
+You should ___ harder.|study|studies|studying|studied
+___ you tell me the way to the station?|Could|Are|Do you|Have
+Will you ___ some cake?|have|has|having|had
+I ___ be fifteen on my next birthday.|will|am|do|have
+He came ___ you left.|after|during|until|by
+My sister did not come back ___ midnight.|until|by the|at the|on
+I jog ___ my health every morning.|for|to|at|by
+She is suffering ___ a cold.|from|of|at|for
+The hotel stands ___ the lake.|by|in|on|into
+The glass broke ___ pieces.|into|in|to|at
+We travel ___ the world.|around|among|between|at
+The difference ___ your idea and mine is not so big.|between|among|from|with
+We traveled ___ Europe.|through|between|among|into
+Paul is a person ___ can do anything.|who|which|whose|what
+The cat ___ is sleeping is mine.|which|who|whose|what
+Please show me ___ to the station.|the way|way|a way to|ways
+Ken, please introduce ___.|yourself|you|your|yours
+I haven't read ___ of his novels.|any|some|no|many
+Do you have ___ brothers and sisters?|any|some|a|much
+Would you like ___ cup of tea?|another|other|others|any
+We ___ fishing last Sunday.|went|go|gone|going
+He ___ playing in the park now.|is|be|was|does
+He ___ done well in the exam.|has|have|is|does
+The train is going ___ a tunnel.|through|between|among|on
+___ a beautiful flower!|What|How|Which|Why
+I ___ you are right.|guess|guessing|to guess|guesses
+She is ___ a blue blouse today.|wearing|wear|wore|worn
+Our team ___ the baseball game 10 to 1.|won|win|winning|wins
+I ___ the chance to go there.|missed|miss a|missing|lost to
+Let's ___ in a hurry.|go|going|goes|went
+Who ___ up all the pudding?|ate|eat|eaten|eating
+This medicine will ___ your cold.|help|helps|helping|helped
+Spanish is ___ in most of the countries in South America.|spoken|spoke|speaking|speak
+Please speak ___ slowly.|more|most|many|much of
+He has the ___ money of the three brothers.|most|more|many|much
+`.trim().split('\n').map(l=>l.split('|'));
+
+/* ===================== QUIZ BUILDER ===================== */
+function rngOf(seed){let a=seed>>>0;return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function shuf(arr,r){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+const WORDS=RAW.trim().split('\n').map(l=>{const p=l.split('|');return{en:p[0],ja:p[1],p:+p[2]}}).sort((x,y)=>x.p-y.p);
+const N_LESSONS=42;
+const LESSONS=[];
+(function(){const per=WORDS.length/N_LESSONS;for(let i=0;i<N_LESSONS;i++)LESSONS.push(WORDS.slice(Math.round(i*per),Math.round((i+1)*per)))})();
+function lessonLabel(n){const L=LESSONS[n-1];return 'Lesson '+n+' (p.'+L[0].p+'–'+L[L.length-1].p+')'}
+const VERB_Q=(function(){const r=rngOf(4242),a=[];VERBS.forEach(v=>{a.push([v,1]);a.push([v,2]);a.push([v,3])});return shuf(a,r)})();
+const COMP_Q=(function(){const r=rngOf(1717),a=[];COMPS.forEach(c=>{a.push([c,1]);a.push([c,2])});return shuf(a,r)})();
+function uniq(a){return a.filter((x,i)=>a.indexOf(x)===i)}
+function mk(tag,prompt,sub,ans,wrong,r){const opts=shuf([ans].concat(wrong.slice(0,3)),r);return{tag,prompt,sub,opts,ans:opts.indexOf(ans)}}
+function buildQuiz(n){
+  const r=rngOf(n*7919+13),qs=[],L=LESSONS[n-1];
+  shuf(L,r).slice(0,10).forEach((w,i)=>{
+    const f=i%2===0?'ja':'en',g=f==='ja'?'en':'ja';
+    const wrong=uniq(shuf(WORDS,r).filter(x=>x[f]!==w[f]&&x.en!==w.en).map(x=>x[f])).slice(0,3);
+    qs.push(mk('VOCAB 単語',w[g],f==='ja'?'日本語の意味は？':'英語で言うと？',w[f],wrong,r));
+  });
+  for(let k=0;k<4;k++){
+    const it=VERB_Q[((n-1)*4+k)%VERB_Q.length],v=it[0],f=it[1];
+    const name=['','過去形','過去分詞','-ing形'][f],ans=v[f];
+    const cand=uniq([v[0]+'ed',v[1],v[2],v[0]+'en',v[3],v[0]+'s',v[0]+'ing',v[0]]).filter(x=>x!==ans);
+    qs.push(mk('VERB 動詞の活用',v[0],name+' はどれ？',ans,shuf(cand,r),r));
+  }
+  for(let k=0;k<2;k++){
+    const it=COMP_Q[((n-1)*2+k)%COMP_Q.length],c=it[0],f=it[1],ans=c[f];
+    const cand=uniq([c[1],c[2],'more '+c[0],'most '+c[0],c[0]+'er',c[0]+'est',c[0]+'ier']).filter(x=>x!==ans);
+    qs.push(mk('COMPARE 比較',c[0],(f===1?'比較級':'最上級')+' はどれ？',ans,shuf(cand,r),r));
+  }
+  for(let k=0;k<4;k++){
+    const g=GRAMMAR[((n-1)*4+k)%GRAMMAR.length];
+    qs.push(mk('GRAMMAR 文法',g[0],'___ に入るのは？',g[1],g.slice(2),r));
+  }
+  return shuf(qs,r);
+}
+</script>
+
+<script>
+/* ===================== SETTINGS ===================== */
+const SB_URL='https://lyvgdejxhyjlhultbllg.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx5dmdkZWp4aHlqbGh1bHRibGxnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNTkxODEsImV4cCI6MjA5NDczNTE4MX0.RqLEB9WqnDUm27VgFfkoTxp-LNT-C36xeVqH1dAAu8I';
+const TEACHER_PIN='2468';      // change this
+const QUIZ_SECONDS=300;        // 5 minutes
+const POINTS=100;              // per correct answer (+1 per second left if all answered)
+
+const sb=supabase.createClient(SB_URL,SB_KEY);
+const app=document.getElementById('app');
+let timers=[],offset=0;
+function clearTimers(){timers.forEach(clearInterval);timers=[]}
+function every(ms,fn){fn();const t=setInterval(fn,ms);timers.push(t);return t}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function now(){return Date.now()+offset}
+function mem(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
+async function syncClock(){try{const t0=Date.now();const{data}=await sb.rpc('quiz_now');if(data)offset=new Date(data).getTime()-(t0+Date.now())/2}catch(e){}}
+function fail(e){app.innerHTML='<div class="card"><p class="err">Error: '+esc(e&&e.message||e)+'</p><p>Check that the SQL setup script was run in Supabase.</p><button class="btn ghost" onclick="location.reload()">Reload</button></div>'}
+function medal(i){return ['🥇','🥈','🥉'][i]||(i+1)}
+function fmt(s){s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
+function boardHTML(rows,names,meId,limit){
+  if(!rows.length)return '<p class="center">—</p>';
+  return rows.slice(0,limit||999).map((r,i)=>'<div class="row'+(r.student_id===meId?' me':'')+'"><div class="rk">'+medal(i)+'</div><div class="nm">'+esc(names[r.student_id]||'?')+'</div><div class="xs">'+r.correct+'/'+r.answered+'</div><div class="sc">'+r.score+'</div></div>').join('');
+}
+async function namesOf(classId){let q=sb.from('quiz_students').select('id,name,class_id');if(classId)q=q.eq('class_id',classId);const{data,error}=await q.order('name');if(error)throw error;const m={};data.forEach(s=>m[s.id]=s.name);return{list:data,map:m}}
+
+/* ===================== STUDENT ===================== */
+async function studentInit(sid){
+  try{
+    await syncClock();
+    const{data:ses,error}=await sb.from('quiz_sessions').select('*').eq('id',sid).single();
+    if(error)throw error;
+    const st=await namesOf(ses.class_id);
+    const saved=mem('quiz_me_'+sid);
+    if(saved&&st.map[saved])return studentJoin(ses,st,saved);
+    app.innerHTML='<h1>⚔️ Word Battle</h1><p>'+esc(lessonLabel(ses.lesson))+'<br>名前をえらんでください / Tap your name</p><div class="names">'+st.list.map(s=>'<button class="opt" data-id="'+s.id+'">'+esc(s.name)+'</button>').join('')+'</div>';
+    app.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{if(confirm(b.textContent+' — OK?')){mem('quiz_me_'+sid,b.dataset.id);studentJoin(ses,st,b.dataset.id)}});
+  }catch(e){fail(e)}
+}
+async function studentJoin(ses,st,meId){
+  try{
+    await sb.from('quiz_scores').upsert({session_id:ses.id,student_id:meId,class_id:ses.class_id,lesson:ses.lesson},{onConflict:'session_id,student_id',ignoreDuplicates:true});
+    const{data:row,error}=await sb.from('quiz_scores').select('*').eq('session_id',ses.id).eq('student_id',meId).single();
+    if(error)throw error;
+    const S={ses,st,meId,row,qs:buildQuiz(ses.lesson),mode:''};
+    clearTimers();
+    every(2000,async()=>{
+      if(S.mode==='quiz'||S.mode==='board')return;
+      const{data}=await sb.from('quiz_sessions').select('*').eq('id',ses.id).single();
+      if(data)S.ses=data;
+      route(S);
+    });
+  }catch(e){fail(e)}
+}
+function endsAt(ses){return new Date(ses.started_at).getTime()+QUIZ_SECONDS*1000}
+function route(S){
+  const s=S.ses;
+  if(s.status==='lobby'){
+    if(S.mode!=='lobby'){S.mode='lobby';app.innerHTML='<h1>⚔️ Word Battle</h1><div class="card center"><p>'+esc(S.st.map[S.meId])+' さん</p><div class="big">READY</div><p>先生がスタートするまで待ってね<br>Waiting for the teacher to start…</p></div>'}
+    return;
+  }
+  if(s.status==='live'&&now()<endsAt(s)&&!S.row.finished)return startQuiz(S);
+  showBoard(S);
+}
+function startQuiz(S){
+  S.mode='quiz';let i=S.row.answered||0,locked=false;
+  const total=S.qs.length;
+  const tick=setInterval(()=>{
+    const left=(endsAt(S.ses)-now())/1000,el=document.getElementById('tm');
+    if(el){el.textContent=fmt(left);el.className='timer'+(left<30?' low':'')}
+    if(left<=0){clearInterval(tick);finish(false)}
+  },250);
+  timers.push(tick);
+  function push(extra){const u=Object.assign({score:S.row.score,correct:S.row.correct,answered:S.row.answered,updated_at:new Date().toISOString()},extra||{});return sb.from('quiz_scores').update(u).eq('id',S.row.id)}
+  async function finish(all){
+    clearInterval(tick);
+    if(all){S.row.score+=Math.max(0,Math.floor((endsAt(S.ses)-now())/1000))}
+    S.row.finished=true;
+    try{await push({finished:true})}catch(e){}
+    showBoard(S);
+  }
+  function draw(){
+    if(i>=total)return finish(true);
+    const q=S.qs[i];locked=false;
+    app.innerHTML='<div class="bar"><span>'+(i+1)+' / '+total+'</span><span>⭐ '+S.row.score+'</span><span id="tm" class="timer">'+fmt((endsAt(S.ses)-now())/1000)+'</span></div><div class="prog"><i style="width:'+(i/total*100)+'%"></i></div><div class="card"><span class="tag">'+q.tag+'</span><div class="prompt">'+esc(q.prompt)+'</div><div class="sub">'+esc(q.sub)+'</div></div>'+q.opts.map((o,k)=>'<button class="opt" data-k="'+k+'">'+esc(o)+'</button>').join('');
+    app.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+      if(locked)return;locked=true;
+      const k=+b.dataset.k,ok=k===q.ans;
+      app.querySelectorAll('.opt')[q.ans].classList.add('ok');
+      if(!ok)b.classList.add('bad');
+      if(ok){S.row.score+=POINTS;S.row.correct++}
+      S.row.answered=++i;
+      push();
+      setTimeout(draw,ok?450:1300);
+    });
+  }
+  draw();
+}
+function showBoard(S){
+  if(S.mode==='board')return;S.mode='board';clearTimers();
+  every(3000,async()=>{
+    const[{data:rows},{data:ses}]=await Promise.all([sb.from('quiz_scores').select('*').eq('session_id',S.ses.id).order('score',{ascending:false}),sb.from('quiz_sessions').select('*').eq('id',S.ses.id).single()]);
+    if(ses)S.ses=ses;if(!rows)return;
+    const left=S.ses.started_at?(endsAt(S.ses)-now())/1000:0,over=S.ses.status==='done'||left<=0;
+    const my=rows.findIndex(r=>r.student_id===S.meId),me=rows[my]||S.row;
+    app.innerHTML='<h1>'+(over?'🏆 RESULTS':'⏳ Finished!')+'</h1><div class="card center"><p>'+esc(S.st.map[S.meId])+'</p><div class="big">'+me.score+'</div><p>'+me.correct+' / '+S.qs.length+' correct'+(over?' ・ '+(my+1)+'位 / '+rows.length+'人':'')+'</p>'+(over?'':'<p>のこり '+fmt(left)+' — 結果発表を待ってね</p>')+'</div>'+(over?'<h2>Leaderboard</h2>'+boardHTML(rows,S.st.map,S.meId,10)+(my>=10?'<p class="center">…</p>'+boardHTML([rows[my]],S.st.map,S.meId).replace(/<div class="rk">.*?<\/div>/,'<div class="rk">'+(my+1)+'</div>'):''):'');
+  });
+}
+
+/* ===================== TEACHER ===================== */
+let T={tab:'run',classes:[],classId:''};
+function teacherGate(){
+  let ok=false;try{ok=sessionStorage.getItem('quiz_t')==='1'}catch(e){}
+  if(ok)return teacherHome();
+  app.innerHTML='<h1>⚔️ KANA Word Battle</h1><p>Students: scan the QR code your teacher shows.</p><div class="card"><h2>Teacher</h2><input id="pin" type="password" inputmode="numeric" placeholder="PIN"><button class="btn" id="go">Enter</button></div>';
+  document.getElementById('go').onclick=()=>{if(document.getElementById('pin').value===TEACHER_PIN){try{sessionStorage.setItem('quiz_t','1')}catch(e){}teacherHome()}else alert('Wrong PIN')};
+}
+async function loadClasses(){const{data,error}=await sb.from('quiz_classes').select('*').order('name');if(error)throw error;T.classes=data;if(!T.classId&&data[0])T.classId=data[0].id}
+function classSelect(id,all){return '<select id="'+id+'">'+(all?'<option value="">All classes</option>':'')+T.classes.map(c=>'<option value="'+c.id+'"'+(c.id===T.classId?' selected':'')+'>'+esc(c.name)+'</option>').join('')+'</select>'}
+async function teacherHome(){
+  clearTimers();app.className='wide';
+  try{await loadClasses()}catch(e){return fail(e)}
+  const tabs=[['run','▶ Run a quiz'],['roster','👥 Roster'],['season','🏆 Season']];
+  app.innerHTML='<h1>⚔️ Word Battle — Teacher</h1><div class="tabs">'+tabs.map(t=>'<button data-t="'+t[0]+'" class="'+(T.tab===t[0]?'on':'')+'">'+t[1]+'</button>').join('')+'</div><div id="pane"></div>';
+  app.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{T.tab=b.dataset.t;teacherHome()});
+  const pane=document.getElementById('pane');
+  ({run:paneRun,roster:paneRoster,season:paneSeason})[T.tab](pane).catch(fail);
+}
+async function paneRun(pane){
+  if(!T.classes.length){pane.innerHTML='<div class="card"><p>Add a class and students in the Roster tab first.</p></div>';return}
+  pane.innerHTML='<div class="card"><label>Class</label>'+classSelect('cls')+'<label>Lesson</label><select id="les">'+LESSONS.map((L,i)=>'<option value="'+(i+1)+'">'+esc(lessonLabel(i+1))+'</option>').join('')+'</select><button class="btn gold" id="mk">Create game + QR code</button><button class="btn ghost" id="pv">Preview questions</button></div><div id="pvout"></div>';
+  const last=mem('quiz_last_lesson');if(last)document.getElementById('les').value=Math.min(N_LESSONS,+last+1);
+  document.getElementById('cls').onchange=e=>T.classId=e.target.value;
+  document.getElementById('pv').onclick=()=>{const n=+document.getElementById('les').value;document.getElementById('pvout').innerHTML='<div class="card"><h2>'+esc(lessonLabel(n))+'</h2><p>Words: '+LESSONS[n-1].map(w=>esc(w.en)).join(', ')+'</p>'+buildQuiz(n).map((q,i)=>'<div class="row"><div class="rk">'+(i+1)+'</div><div class="nm" style="white-space:normal">'+esc(q.prompt)+' <span class="xs">'+esc(q.sub)+'</span><br><b style="color:var(--ok)">'+esc(q.opts[q.ans])+'</b> <span class="xs">/ '+q.opts.filter((o,k)=>k!==q.ans).map(esc).join(' / ')+'</span></div></div>').join('')+'</div>'};
+  document.getElementById('mk').onclick=async()=>{
+    const lesson=+document.getElementById('les').value;
+    const{data,error}=await sb.from('quiz_sessions').insert({class_id:T.classId,lesson}).select().single();
+    if(error)return fail(error);
+    mem('quiz_last_lesson',lesson);location.href=location.pathname+'?host='+data.id;
+  };
+}
+async function hostGame(sid){
+  clearTimers();app.className='wide';
+  try{
+    await syncClock();
+    let{data:ses,error}=await sb.from('quiz_sessions').select('*').eq('id',sid).single();if(error)throw error;
+    const st=await namesOf(ses.class_id),url=location.origin+location.pathname+'?s='+sid;
+    app.innerHTML='<h1>'+esc(lessonLabel(ses.lesson))+'</h1><div id="top"></div><h2 id="bh"></h2><div id="board"></div><button class="btn ghost" id="back">← Back to teacher menu</button>';
+    document.getElementById('back').onclick=()=>{location.href=location.pathname+'?teacher=1'};
+    const top=document.getElementById('top');let drawn='';
+    function drawTop(){
+      if(drawn===ses.status)return;drawn=ses.status;
+      if(ses.status==='lobby'){
+        top.innerHTML='<div class="card center"><div id="qr"></div><p style="word-break:break-all">'+esc(url)+'</p><button class="btn gold" id="st">START (5:00)</button></div>';
+        new QRCode(document.getElementById('qr'),{text:url,width:240,height:240});
+        document.getElementById('st').onclick=async()=>{const{error}=await sb.rpc('quiz_start',{sid});if(error)return fail(error);const r=await sb.from('quiz_sessions').select('*').eq('id',sid).single();ses=r.data;drawTop()};
+      }else if(ses.status==='live'){
+        top.innerHTML='<div class="card center"><div class="big" id="ht">5:00</div><button class="btn small ghost" id="end">End now</button></div>';
+        document.getElementById('end').onclick=()=>{if(confirm('End the quiz now?'))finishHost()};
+      }else top.innerHTML='<div class="card center"><div class="big">🏆 FINAL</div></div>';
+    }
+    async function finishHost(){await sb.from('quiz_sessions').update({status:'done'}).eq('id',sid);ses.status='done';drawTop()}
+    every(500,()=>{if(ses.status!=='live')return;const left=(endsAt(ses)-now())/1000,el=document.getElementById('ht');if(el)el.textContent=fmt(left);if(left<=0)finishHost()});
+    every(2000,async()=>{
+      drawTop();
+      const{data:rows}=await sb.from('quiz_scores').select('*').eq('session_id',sid).order('score',{ascending:false});if(!rows)return;
+      if(ses.status==='lobby'){document.getElementById('bh').textContent='Joined: '+rows.length+' / '+st.list.length;document.getElementById('board').innerHTML=rows.map(r=>'<span class="chip">'+esc(st.map[r.student_id]||'?')+'</span>').join('')}
+      else{document.getElementById('bh').textContent=ses.status==='live'?'Live scores':'Leaderboard';document.getElementById('board').innerHTML=boardHTML(rows,st.map)}
+    });
+  }catch(e){fail(e)}
+}
+async function paneRoster(pane){
+  const st=T.classId?await namesOf(T.classId):{list:[]};
+  pane.innerHTML='<div class="card"><h2>Classes</h2>'+(T.classes.length?classSelect('cls'):'<p>No classes yet.</p>')+'<input id="cn" placeholder="New class name (e.g. JHS2 Tuesday)"><button class="btn" id="addc">Add class</button>'+(T.classId?'<button class="btn small ghost" id="delc">Delete this class</button>':'')+'</div>'+(T.classId?'<div class="card"><h2>Students ('+st.list.length+')</h2>'+st.list.map(s=>'<span class="chip">'+esc(s.name)+' <a href="#" data-id="'+s.id+'" style="color:var(--bad);text-decoration:none">✕</a></span>').join('')+'<textarea id="names" placeholder="Paste names, one per line"></textarea><button class="btn" id="adds">Add students</button></div>':'');
+  const cls=document.getElementById('cls');if(cls)cls.onchange=e=>{T.classId=e.target.value;teacherHome()};
+  document.getElementById('addc').onclick=async()=>{const name=document.getElementById('cn').value.trim();if(!name)return;const{data,error}=await sb.from('quiz_classes').insert({name}).select().single();if(error)return fail(error);T.classId=data.id;teacherHome()};
+  const delc=document.getElementById('delc');if(delc)delc.onclick=async()=>{if(!confirm('Delete this class, its students AND all their scores?'))return;await sb.from('quiz_classes').delete().eq('id',T.classId);T.classId='';teacherHome()};
+  const adds=document.getElementById('adds');if(adds)adds.onclick=async()=>{const rows=document.getElementById('names').value.split('\n').map(s=>s.trim()).filter(Boolean).map(name=>({name,class_id:T.classId}));if(!rows.length)return;const{error}=await sb.from('quiz_students').insert(rows);if(error)return fail(error);teacherHome()};
+  pane.querySelectorAll('a[data-id]').forEach(a=>a.onclick=async e=>{e.preventDefault();if(!confirm('Remove this student and their scores?'))return;await sb.from('quiz_students').delete().eq('id',a.dataset.id);teacherHome()});
+}
+async function paneSeason(pane){
+  pane.innerHTML='<div class="card">'+classSelect('cls',true)+'</div><div id="sb"></div>';
+  const sel=document.getElementById('cls');
+  async function load(){
+    const cid=sel.value;let q=sb.from('quiz_scores').select('student_id,lesson,score,correct,answered');if(cid)q=q.eq('class_id',cid);
+    const[{data:rows,error},st]=await Promise.all([q.limit(10000),namesOf(cid)]);if(error)return fail(error);
+    const best={};rows.forEach(r=>{const k=r.student_id+'|'+r.lesson;if(!best[k]||r.score>best[k].score)best[k]=r});
+    const tot={};Object.values(best).forEach(r=>{const t=tot[r.student_id]||(tot[r.student_id]={student_id:r.student_id,score:0,correct:0,answered:0,n:0});t.score+=r.score;t.correct+=r.correct;t.answered+=r.answered;t.n++});
+    const list=Object.values(tot).sort((a,b)=>b.score-a.score);
+    document.getElementById('sb').innerHTML='<h2>Season total (best score per lesson)</h2>'+(list.length?list.map((r,i)=>'<div class="row"><div class="rk">'+medal(i)+'</div><div class="nm">'+esc(st.map[r.student_id]||'?')+'</div><div class="xs">'+r.n+' quizzes ・ '+(r.answered?Math.round(r.correct/r.answered*100):0)+'%</div><div class="sc">'+r.score+'</div></div>').join(''):'<p>No scores yet.</p>');
+  }
+  sel.onchange=load;await load();
+}
+
+/* ===================== ROUTER ===================== */
+(function(){
+  const p=new URLSearchParams(location.search);
+  if(p.get('s'))studentInit(p.get('s'));
+  else if(p.get('host'))hostGame(p.get('host'));
+  else teacherGate();
+})();
+</script>
+</body>
+</html>
